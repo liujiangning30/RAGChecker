@@ -1,5 +1,8 @@
 import os
 from typing import List
+import warnings
+
+from concurrent.futures import ThreadPoolExecutor, as_completed
 
 from refchecker.extractor import LLMExtractor
 from refchecker.checker import (
@@ -216,14 +219,48 @@ class RAGChecker():
                 ret_metrics.add(metric)
         for metric in ret_metrics:
             requirements.update(METRIC_REQUIREMENTS[metric])
-        
-        # compute the required intermediate results
-        for requirement in requirements:
-            self.check_claims(results, check_type=requirement)
-            if save_path is not None:
-                with open(save_path, "w") as f:
-                    f.write(results.to_json(indent=2))
 
+        # compute the required intermediate results
+        # for requirement in requirements:
+        #     self.check_claims(results, check_type=requirement)
+        #     if save_path is not None:
+        #         with open(save_path, "w") as f:
+        #             f.write(results.to_json(indent=2))
+        
+        extract_type = dict()
+        for requirement in requirements:
+            if requirement.endswith('2response'):
+                extract_type['response'] = 'response'
+            elif requirement.endswith('2answer'):
+                extract_type['answer'] = 'gt_answer'
+        with ThreadPoolExecutor() as executor:
+            _results = [ret for ret in results.results]
+            future_to_et = {
+                executor.submit(self.extract_claims, _results, et): et
+                for et in extract_type.values()
+            }
+            for future in as_completed(future_to_et):
+                et = future_to_et[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    warnings.warn(f'{et} generated an exception: {exc}')
+        with ThreadPoolExecutor() as executor:
+            future_to_requirement = {
+                executor.submit(self.check_claims, results, requirement): requirement
+                for requirement in requirements
+            }
+            for future in as_completed(future_to_requirement):
+                requirement = future_to_requirement[future]
+                try:
+                    future.result()
+                except Exception as exc:
+                    warnings.warn(f'{requirement} generated an exception: {exc}')
+                    raise
+                else:
+                    if save_path is not None:
+                        with open(save_path, "w") as f:
+                            f.write(results.to_json(indent=2))
         # compute the metrics
         for metric in ret_metrics:
             for result in results.results:

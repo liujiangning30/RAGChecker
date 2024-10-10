@@ -1,10 +1,22 @@
 import os
 import json
+import argparse
 from argparse import ArgumentParser, RawTextHelpFormatter
 
 from .evaluator import RAGChecker
 from .container import RAGResults
 from .metrics import *
+
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 
 def get_args():
@@ -54,21 +66,23 @@ def get_args():
     parser.add_argument(
         '--openai_api_key', type=str
     )
+    # parser.add_argument(
+    #     "--disable_joint_check", action="store_false", dest="joint_check",
+    #     help="Disable joint checking of the claims."
+    # )
+    # parser.set_defaults(joint_check=True)
     parser.add_argument(
-        "--disable_joint_check", action="store_false", dest="joint_check",
-        help="Disable joint checking of the claims."
+        "--joint_check", type=str2bool, default=True, help="Whether to joint checking of the claims. "
     )
-    parser.set_defaults(joint_check=True)
     parser.add_argument(
         "--joint_check_num", type=int, default=5
     )
-
-
     return parser.parse_args()
 
 
 def main():
     args = get_args()
+
     evaluator = RAGChecker(
         extractor_name=args.extractor_name,
         checker_name=args.checker_name,
@@ -83,6 +97,7 @@ def main():
     )
     with open(args.input_path, "r") as f:
         rag_results = RAGResults.from_json(f.read())
+    # rag_results.results = rag_results.results[:2]
     evaluator.evaluate(rag_results, metrics=args.metrics, save_path=args.output_path)
     print(json.dumps(rag_results.metrics, indent=2))
     with open(args.output_path, "w") as f:

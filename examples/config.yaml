@@ -1,0 +1,11 @@
+model_list:
+- litellm_params:
+    api_base: http://127.0.0.1:23333/v1/
+    api_key: sk-1234
+    model: openai/Llama-3-70B-Instruct
+  model_name: Llama-3-70B-Instruct
+- litellm_params:
+    api_base: http://127.0.0.1:23334/v1/
+    api_key: sk-1234
+    model: openai/Llama-3-70B-Instruct
+  model_name: Llama-3-70B-Instruct
